@@ -10,6 +10,35 @@ import (
 	"github.com/eiannone/keyboard"
 )
 
+// frequency to angular velocity
+func w(dHertz float64) float64 {
+	return dHertz * 2.0 * math.Pi;
+}
+// General Purpose Oscillator
+const OSC_SINE int = 0
+const OSC_SQUARE int = 1
+const OSC_TRIANGLE int = 2
+const OSC_SAW_ANA int = 3
+const OSC_SAW_DIG int = 4
+const OSC_NOISE int = 5
+
+//Oscillator
+func ocs(dHertz float64, dTime float64, nType int) float64 {
+	switch nType {
+	case OSC_SINE: return math.Sin(w(dHertz) * dTime) //Sine waveform
+	case OSC_SQUARE: return math.Sin(w(dHertz) * dTime) //Square waveform
+	case OSC_TRIANGLE: return math.Asin(math.Sin(w(dHertz) * dTime) * (2.0 / math.Pi)) //Triangle waveform
+	case OSC_SAW_ANA:
+		{
+			var dOutput float64 = 0.0
+			for i := 1.0; i < 40.0; i++ {
+				dOutput += (math.Sin(i * w(dHertz) * dTime)) / i 
+			}
+			return dOutput * (2.0 / math.Pi)
+		}
+	}
+} 
+
 // Global variables
 var dFrequencyOutput float64 = 0.0
 var dOctaveBaseFrequency float64 = 110.0
