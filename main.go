@@ -6,6 +6,7 @@ import (
 	"math"
 	"github.com/Abhishek-jha-96/Go_SoundSynth/NoiseMaker"
 	"time"
+	"math/rand"
 
 	"github.com/eiannone/keyboard"
 )
@@ -36,6 +37,14 @@ func ocs(dHertz float64, dTime float64, nType int) float64 {
 			}
 			return dOutput * (2.0 / math.Pi)
 		}
+	case OSC_SAW_DIG:
+		return (2.0 /math.Pi) * (dHertz * math.Pi * math.Mod(dTime, 1.0 / dHertz) - (math.Pi / 2.0))	
+	case OSC_NOISE:
+		source := rand.NewSource(time.Now().UnixNano())
+		r := rand.New(source)
+		return 2.0*r.Float64() - 1.0
+	default:
+		return 0.0	
 	}
 } 
 
