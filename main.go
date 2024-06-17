@@ -16,12 +16,14 @@ func w(dHertz float64) float64 {
 	return dHertz * 2.0 * math.Pi;
 }
 // General Purpose Oscillator
-const OSC_SINE int = 0
-const OSC_SQUARE int = 1
-const OSC_TRIANGLE int = 2
-const OSC_SAW_ANA int = 3
-const OSC_SAW_DIG int = 4
-const OSC_NOISE int = 5
+const (
+	OSC_SINE     int = 0
+	OSC_SQUARE   int = 1
+	OSC_TRIANGLE int = 2
+	OSC_SAW_ANA  int = 3
+	OSC_SAW_DIG  int = 4
+	OSC_NOISE    int = 5
+)
 
 //Oscillator
 func ocs(dHertz float64, dTime float64, nType int) float64 {
@@ -48,22 +50,89 @@ func ocs(dHertz float64, dTime float64, nType int) float64 {
 	}
 } 
 
+// Amplitude (attack, Decay, Sustain, Release) Envelope
+type sEnvelopeADSR struct {
+	dAttackTime float64
+	dDecayTime float64
+	dSustainAmplitude float64
+	dReleaseTime float64
+	dStartAmplitude float64
+	dTriggerOffTime float64
+	dTriggerOnTime float64
+	bNoteOn bool
+}
+
+// Constructor for sEnvelopeADSR
+func NewEnvelopeADSR() *sEnvelopeADSR {
+	return &sEnvelopeADSR{
+		dAttackTime:       0.10,
+		dDecayTime:        0.01,
+		dStartAmplitude:   1.0,
+		dSustainAmplitude: 0.8,
+		dReleaseTime:      0.20,
+		bNoteOn:           false,
+		dTriggerOffTime:   0.0,
+		dTriggerOnTime:    0.0,
+	}
+}
+
+// NoteOn method
+func (env *sEnvelopeADSR) NoteOn(dTimeOn float64) {
+	env.dTriggerOnTime = dTimeOn
+	env.bNoteOn = true
+}	
+
+// NoteOff method
+func (env *sEnvelopeADSR) NoteOff(dTimeOff float64) {
+	env.dTriggerOffTime = dTimeOff
+	env.bNoteOn = false
+} 
+
+//GetAmplitude method
+func (env *sEnvelopeADSR) GetAmplitude(dTime float64) float64 {
+	var dAmplitude float64 = 0.0
+	var dLifeTime float64 = dTime - env.dTriggerOnTime
+
+	if env.bNoteOn {
+		if dLifeTime <= env.dAttackTime {
+			dAmplitude = (dLifeTime / env.dAttackTime) * env.dStartAmplitude
+		}
+		if dLifeTime > env.dAttackTime && dLifeTime <= (env.dAttackTime + env.dDecayTime) {
+			dAmplitude = ((dLifeTime - env.dAttackTime) / env.dDecayTime) * (env.dSustainAmplitude - env.dStartAmplitude) + env.dStartAmplitude
+		}
+		if dLifeTime > (env.dAttackTime + env.dDecayTime) {
+			dAmplitude = env.dSustainAmplitude
+		}
+	} else {
+		dAmplitude = ((dTime - env.dTriggerOffTime) / env.dReleaseTime) * (0.0 - env.dSustainAmplitude) + env.dSustainAmplitude
+	}
+
+	if (dAmplitude <= 0.0001) {
+		dAmplitude = 0.0
+	}
+
+	return dAmplitude
+}
+
+
 // Global variables
 var dFrequencyOutput float64 = 0.0
 var dOctaveBaseFrequency float64 = 110.0
 var d12thRootOf2 float64 = math.Pow(2.0, 1.0/12.0)
 
 // function used to generate sound waves
-func MakeNoise(dTime float64) float64 {
-	dOutput := math.Sin(dFrequencyOutput * 2.0 * math.Pi * dTime)
-	return dOutput * 0.5
+func (env *sEnvelopeADSR) MakeNoise (dTime float64) float64 {
+	dOutput := env.GetAmplitude(dTime) * (1.0*ocs(dFrequencyOutput*0.5, dTime, OSC_SINE) + 1.0*ocs(dFrequencyOutput, dTime, OSC_SAW_ANA))
+	return dOutput * 0.4
 }
 
 func main() {
 	audioInstance := NoiseMaker.NewAudio(44100, 1, 8, 512)
 	fmt.Println("Audio initialized")
 
-	audioInstance.SetUserFunction(MakeNoise)
+	envelope := NewEnvelopeADSR()
+
+	audioInstance.SetUserFunction(envelope.MakeNoise)
 
 	// Create a new keyboard input instance
 	err := keyboard.Open()
@@ -103,7 +172,7 @@ func main() {
 
 			if !bKeyPressed {
 				if nCurrentKey != -1 {
-					fmt.Printf("\rNote Off                          ")
+					fmt.Printf("\rNote Off    ")
 					nCurrentKey = -1
 				}
 				dFrequencyOutput = 0.0
