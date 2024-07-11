@@ -1,5 +1,11 @@
 package main
 
+// import (
+// 	"math"
+// 	"github.com/Abhishek-jha-96/Go_SoundSynth/NoiseMaker"
+// 	"time"
+// )
+
 import (
 	"fmt"
 	"log"
@@ -114,7 +120,6 @@ func (env *sEnvelopeADSR) GetAmplitude(dTime float64) float64 {
 	return dAmplitude
 }
 
-
 // Global variables
 var dFrequencyOutput float64 = 0.0
 var dOctaveBaseFrequency float64 = 110.0
@@ -127,74 +132,74 @@ func (env *sEnvelopeADSR) MakeNoise (dTime float64) float64 {
 }
 
 func main() {
-	audioInstance := NoiseMaker.NewAudio(44100, 1, 8, 512)
-	fmt.Println("Audio initialized")
+    audioInstance := NoiseMaker.NewAudio(44100, 1, 8, 512)
+    fmt.Println("Audio initialized")
 
-	envelope := NewEnvelopeADSR()
+    envelope := NewEnvelopeADSR()
+    audioInstance.SetUserFunction(envelope.MakeNoise)
 
-	audioInstance.SetUserFunction(envelope.MakeNoise)
+    // Keyboard setup (as before)
+    err := keyboard.Open()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer keyboard.Close()
 
-	// Create a new keyboard input instance
-	err := keyboard.Open()
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer keyboard.Close()
+    var nCurrentKey int = -1
+    var bKeyPressed bool
 
-	var nCurrentKey int = -1
-	var bKeyPressed bool
-	done := make(chan bool)
+    fmt.Println("Press keys to play notes. Press 'q' to quit.")
+    for {
+        char, _, err := keyboard.GetKey()
+        if err != nil {
+            log.Fatal(err)
+        }
 
-	go func() {
-		defer close(done)
-		for {
-			bKeyPressed = false
-			char, _, err := keyboard.GetKey()
-			if err != nil {
-				// If error is due to keyboard closing, exit the goroutine
-				if err.Error() == "operation canceled" {
-					return
-				}
-				log.Fatal(err)
-			}
+        if char == 'q' {
+            break
+        }
 
-			for i, k := range "ZSXCFVGBNJMK\xbcL\xbe\xbf" {
-				if rune(char) == k {
-					if nCurrentKey != i {
-						dFrequencyOutput = dOctaveBaseFrequency * math.Pow(d12thRootOf2, float64(i))
-						fmt.Printf("\rNote On: %f Hz", dFrequencyOutput)
-						nCurrentKey = i
-					}
-					bKeyPressed = true
-					break
-				}
-			}
+        bKeyPressed = false
+        for i, k := range "ZSXCFVGBNJMK\xbcL\xbe\xbf" {
+            if rune(char) == k {
+                if nCurrentKey != i {
+                    dFrequencyOutput = dOctaveBaseFrequency * math.Pow(d12thRootOf2, float64(i))
+                    fmt.Printf("\rNote On: %f Hz", dFrequencyOutput)
+                    nCurrentKey = i
+                    envelope.NoteOn(audioInstance.GetTime())
+                }
+                bKeyPressed = true
+                break
+            }
+        }
 
-			if !bKeyPressed {
-				if nCurrentKey != -1 {
-					fmt.Printf("\rNote Off    ")
-					nCurrentKey = -1
-				}
-				dFrequencyOutput = 0.0
-			}
+        if !bKeyPressed {
+            if nCurrentKey != -1 {
+                fmt.Printf("\rNote Off    ")
+                nCurrentKey = -1
+                envelope.NoteOff(audioInstance.GetTime())
+            }
+            dFrequencyOutput = 0.0
+        }
 
-			time.Sleep(16 * time.Millisecond) // Sleep to prevent busy looping
-		}
-	}()
+        // Print debug info
+        fmt.Printf("\nCurrent time: %f, Frequency: %f\n", audioInstance.GetTime(), dFrequencyOutput)
+    }
 
-	// Run for 5 seconds to demonstrate functionality
+    audioInstance.Stop()
+    fmt.Println("\nAudio stopped")
+
+    fmt.Println("Global Time:", audioInstance.GetTime())
+}
+
+/* func main() {
+	audio := NoiseMaker.NewAudio(44100, 1, 8, 512)
+	audio.SetUserFunction(func(t float64) float64 {
+		return math.Sin(2 * math.Pi * 440 * t) // 440 Hz sine wave
+	})
+
+	// Let it play for a while
 	time.Sleep(5 * time.Second)
 
-	// Stop the audio and close keyboard
-	audioInstance.Stop()
-	fmt.Println("\nAudio stopped")
-
-	// Close the keyboard to stop the goroutine
-	keyboard.Close()
-
-	// Wait for the goroutine to finish
-	<-done
-
-	fmt.Println("Global Time:", audioInstance.GetTime())
-	fmt.Println("User Process:", audioInstance.UserProcess(0.0))
-}
+	audio.Stop()
+} */
